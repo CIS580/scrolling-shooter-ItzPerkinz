@@ -6,6 +6,8 @@ const Vector = require('./vector');
 const Camera = require('./camera');
 const Player = require('./player');
 const BulletPool = require('./bullet_pool');
+const Missile = require('./missile');
+const Enemy = require('./enemy');
 
 
 /* Global variables */
@@ -18,9 +20,40 @@ var input = {
   right: false
 }
 var camera = new Camera(canvas);
-var bullets = new BulletPool(10);
+var bullets = new BulletPool(5);
 var missiles = [];
 var player = new Player(bullets, missiles);
+
+var missileTimer = 0;
+var level = 1;
+var score = 0;
+
+window.onmousedown = function(event)
+{
+  console.log(player.velocity);
+  player.firing = true;
+  event.preventDefault();
+}
+
+window.onmouseup = function(event)
+{
+  player.firing = false;
+  event.preventDefault();
+}
+
+window.onkeypress = function(event) {
+  event.preventDefault();
+  if (event.keyCode == 32) {
+    switch (player.state)
+    {
+      case "standard":
+      player.fireMissile();
+      if (player.bool == true) missileTimer = 0;
+      break;
+    }
+
+  }
+}
 
 /**
  * @function onkeydown
@@ -100,6 +133,11 @@ masterLoop(performance.now());
  * the number of milliseconds passed since the last frame.
  */
 function update(elapsedTime) {
+  if (player.missileCount < 4) missileTimer += elapsedTime;
+  if (missileTimer > 5000 && player.missileCount < 4) {
+    player.missileCount++;
+    missileTimer = 0;
+  }
 
   // update the player
   player.update(elapsedTime, input);
@@ -115,14 +153,14 @@ function update(elapsedTime) {
 
   // Update missiles
   var markedForRemoval = [];
-  missiles.forEach(function(missile, i){
-    missile.update(elapsedTime);
-    if(Math.abs(missile.position.x - camera.x) > camera.width * 2)
+  player.missiles.forEach(function(m, i){
+    m.update(elapsedTime);
+    if(m.position.y < 0)
       markedForRemoval.unshift(i);
   });
   // Remove missiles that have gone off-screen
   markedForRemoval.forEach(function(index){
-    missiles.splice(index, 1);
+    player.missiles.splice(index, 1);
   });
 }
 
@@ -134,8 +172,18 @@ function update(elapsedTime) {
   * @param {CanvasRenderingContext2D} ctx the context to render to
   */
 function render(elapsedTime, ctx) {
-  ctx.fillStyle = "black";
+  ctx.fillStyle = "grey";
   ctx.fillRect(0, 0, 1024, 786);
+  ctx.font = "15px Tahoma";
+  ctx.fillStyle = "white";
+  ctx.fillText("Lives -- " + player.lives, 5,20);
+  ctx.fillText("Armor -- " + player.armor, 5,40);
+
+  ctx.fillText("Missiles -- " + player.missileCount, 5,80);
+  ctx.fillText("Reload Time -- " + Math.ceil(5 -missileTimer/1000), 5,100);
+
+  ctx.fillText("Level -- " + level, 5,750);
+  ctx.fillText("Score -- " + score, 5,770);
 
   // TODO: Render background
 
@@ -166,8 +214,8 @@ function renderWorld(elapsedTime, ctx) {
     bullets.render(elapsedTime, ctx);
 
     // Render the missiles
-    missiles.forEach(function(missile) {
-      missile.render(elapsedTime, ctx);
+    missiles.forEach(function(m) {
+      m.render(elapsedTime, ctx);
     });
 
     // Render the player

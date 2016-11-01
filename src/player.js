@@ -27,8 +27,21 @@ function Player(bullets, missiles) {
   this.position = {x: 200, y: 200};
   this.velocity = {x: 0, y: 0};
   this.img = new Image()
-  this.img.src = 'assets/tyrian.shp.007D3C.png';
+  this.img.src = 'assets/ships.png';
+
+  this.fired = 0;
+  this.hit = 0;
+
+  this.lives = 3;
+  this.armor = 0;
+
+  this.bool = false;
+  this.firing = false;
+
+  this.state = "standard";
 }
+
+
 
 /**
  * @function update
@@ -38,7 +51,7 @@ function Player(bullets, missiles) {
  * boolean properties: up, left, right, down
  */
 Player.prototype.update = function(elapsedTime, input) {
-
+  this.bool = false;
   // set the velocity
   this.velocity.x = 0;
   if(input.left) this.velocity.x -= PLAYER_SPEED;
@@ -58,8 +71,14 @@ Player.prototype.update = function(elapsedTime, input) {
 
   // don't let the player move off-screen
   if(this.position.x < 0) this.position.x = 0;
-  if(this.position.x > 1024) this.position.x = 1024;
-  if(this.position.y > 786) this.position.y = 786;
+  if(this.position.x > 1001) this.position.x = 1001;
+  if(this.position.y > 759) this.position.y = 759;
+  if(this.position.y < 0) this.position.y = 0;
+
+  var temp = this.velocity.y;
+  if (temp > 1) temp = temp * -1;
+
+  if (this.firing) this.fireBullet({x: 0, y: temp});
 }
 
 /**
@@ -72,8 +91,14 @@ Player.prototype.render = function(elapasedTime, ctx) {
   var offset = this.angle * 23;
   ctx.save();
   ctx.translate(this.position.x, this.position.y);
-  ctx.drawImage(this.img, 48+offset, 57, 23, 27, -12.5, -12, 23, 27);
+  ctx.drawImage(this.img, 48+offset, 57, 23, 27, 0, 0, 46, 54);
+// -12.5, -12,
   ctx.restore();
+/*
+  ctx.strokeStyle = "white";
+  ctx.rect(this.position.x, this.position.y, 46, 54);
+  ctx.stroke();
+*/
 }
 
 /**
@@ -82,7 +107,7 @@ Player.prototype.render = function(elapasedTime, ctx) {
  * @param {Vector} direction
  */
 Player.prototype.fireBullet = function(direction) {
-  var position = Vector.add(this.position, {x:30, y:30});
+  var position = Vector.add(this.position, {x:23, y:30});
   var velocity = Vector.scale(Vector.normalize(direction), BULLET_SPEED);
   this.bullets.add(position, velocity);
 }
@@ -94,9 +119,10 @@ Player.prototype.fireBullet = function(direction) {
  */
 Player.prototype.fireMissile = function() {
   if(this.missileCount > 0){
-    var position = Vector.add(this.position, {x:0, y:30})
-    var missile = new Missile(position);
+    console.log(this.missiles.length);
+    var missile = new Missile(this.position, this.angle );
     this.missiles.push(missile);
     this.missileCount--;
+    if (this.missileCount == 3) this.bool = true;
   }
 }
