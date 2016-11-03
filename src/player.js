@@ -6,7 +6,7 @@ const Missile = require('./missile');
 
 /* Constants */
 const PLAYER_SPEED = 5;
-const BULLET_SPEED = 10;
+const BULLET_SPEED = 20;
 
 /**
  * @module Player
@@ -37,8 +37,14 @@ function Player(bullets, missiles) {
 
   this.bool = false;
   this.firing = false;
+  this.bulletTimer = 0;
 
   this.state = "standard";
+  this.armored = false;
+
+  this.empoweredTimer = 0;
+
+  this.center;
 }
 
 
@@ -52,6 +58,11 @@ function Player(bullets, missiles) {
  */
 Player.prototype.update = function(elapsedTime, input) {
   this.bool = false;
+  if (this.state == "empowered") {
+    this.empoweredTimer += elapsedTime;
+    if (this.empoweredTimer > 10000) { this.state = "standard"; }
+   }
+  this.bulletTimer += elapsedTime;
   // set the velocity
   this.velocity.x = 0;
   if(input.left) this.velocity.x -= PLAYER_SPEED;
@@ -78,7 +89,12 @@ Player.prototype.update = function(elapsedTime, input) {
   var temp = this.velocity.y;
   if (temp > 1) temp = temp * -1;
 
-  if (this.firing) this.fireBullet({x: 0, y: temp});
+  if (this.firing && this.bulletTimer > 10) this.fireBullet({x: 0, y: temp}); this.bulletTimer = 0;
+
+  this.center = {
+    x: this.position.x + 23,
+    y: this.position.y + 5
+  };
 }
 
 /**
@@ -94,11 +110,15 @@ Player.prototype.render = function(elapasedTime, ctx) {
   ctx.drawImage(this.img, 48+offset, 57, 23, 27, 0, 0, 46, 54);
 // -12.5, -12,
   ctx.restore();
-/*
-  ctx.strokeStyle = "white";
-  ctx.rect(this.position.x, this.position.y, 46, 54);
-  ctx.stroke();
-*/
+
+  if (this.armored == true)
+  {
+    ctx.beginPath();
+    ctx.strokeStyle = "yellow";
+    ctx.arc(this.position.x+23, this.position.y+27, 30, 0, Math.PI*2);
+    ctx.closePath();
+    ctx.stroke();
+  }
 }
 
 /**

@@ -19,7 +19,7 @@ function Missile(pos, ang)
   this.img.src = 'assets/weapons.png';
   console.log("Missile created at " + this.position.x + " " + this.position.y);
   this.width = 20;
-  this.height = 28;
+  this.height = 40;
 }
 
 Missile.prototype.update = function(time)
@@ -34,15 +34,11 @@ Missile.prototype.update = function(time)
     break;
 
   }
-  if (this.position.x < 0) this.onScreen = false;
-  if (this.position.x > 1024) this.onScreen = false;
-  if (this.position.y < 0) this.onScreen = false;
-  if (this.position.y > 786) this.onScreen = false;
 }
 
 Missile.prototype.render = function(time, ctx)
 {
-  ctx.drawImage(this.img, 217, 29, 10, 14, this.position.x, this.position.y, 20, 28);
+  ctx.drawImage(this.img, 217, 29, 10, 14, this.position.x, this.position.y, 20, 40);
 /*
   ctx.strokeStyle = "white";
   ctx.rect(this.position.x, this.position.y, this.width, this.height );
