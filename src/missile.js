@@ -17,7 +17,6 @@ function Missile(pos, ang)
   this.onScreen = true;
   this.img = new Image();
   this.img.src = 'assets/weapons.png';
-  console.log("Missile created at " + this.position.x + " " + this.position.y);
   this.width = 20;
   this.height = 40;
 }

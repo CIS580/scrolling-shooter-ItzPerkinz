@@ -87,10 +87,10 @@ BulletPool.prototype.render = function(elapsedTime, ctx) {
   // Render the bullets as a single path
   ctx.save();
   ctx.beginPath();
-  ctx.fillStyle = "red";
+  ctx.fillStyle = "LightBlue";
   for(var i = 0; i < this.end; i++) {
     ctx.moveTo(this.pool[4*i], this.pool[4*i+1]);
-    ctx.arc(this.pool[4*i], this.pool[4*i+1], 3, 0, 2*Math.PI);
+    ctx.arc(this.pool[4*i], this.pool[4*i+1], 4, 0, 2*Math.PI);
   }
   ctx.fill();
   ctx.restore();

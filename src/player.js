@@ -3,6 +3,7 @@
 /* Classes and Libraries */
 const Vector = require('./vector');
 const Missile = require('./missile');
+const Laser = require('./laser');
 
 /* Constants */
 const PLAYER_SPEED = 5;
@@ -21,6 +22,7 @@ module.exports = exports = Player;
  */
 function Player(bullets, missiles) {
   this.missiles = missiles;
+  this.lasers = [];
   this.missileCount = 4;
   this.bullets = bullets;
   this.angle = 0;
@@ -29,9 +31,6 @@ function Player(bullets, missiles) {
   this.img = new Image()
   this.img.src = 'assets/ships.png';
 
-  this.fired = 0;
-  this.hit = 0;
-
   this.lives = 3;
   this.armor = 0;
 
@@ -39,10 +38,11 @@ function Player(bullets, missiles) {
   this.firing = false;
   this.bulletTimer = 0;
 
-  this.state = "standard";
+  this.state = "default";
   this.armored = false;
 
   this.empoweredTimer = 0;
+  this.stars = 1;
 
   this.center;
 }
@@ -60,7 +60,7 @@ Player.prototype.update = function(elapsedTime, input) {
   this.bool = false;
   if (this.state == "empowered") {
     this.empoweredTimer += elapsedTime;
-    if (this.empoweredTimer > 10000) { this.state = "standard"; }
+    if (this.empoweredTimer > 10000) { this.state = "default"; }
    }
   this.bulletTimer += elapsedTime;
   // set the velocity
@@ -79,12 +79,13 @@ Player.prototype.update = function(elapsedTime, input) {
   // move the player
   this.position.x += this.velocity.x;
   this.position.y += this.velocity.y;
+  this.position.y -= .5;
 
   // don't let the player move off-screen
   if(this.position.x < 0) this.position.x = 0;
   if(this.position.x > 1001) this.position.x = 1001;
-  if(this.position.y > 759) this.position.y = 759;
-  if(this.position.y < 0) this.position.y = 0;
+  //if(this.position.y > 759) this.position.y = 759;
+  //if(this.position.y < 0) this.position.y = 0;
 
   var temp = this.velocity.y;
   if (temp > 1) temp = temp * -1;
@@ -119,6 +120,7 @@ Player.prototype.render = function(elapasedTime, ctx) {
     ctx.closePath();
     ctx.stroke();
   }
+
 }
 
 /**
@@ -145,4 +147,9 @@ Player.prototype.fireMissile = function() {
     this.missileCount--;
     if (this.missileCount == 3) this.bool = true;
   }
+}
+
+Player.prototype.fireLaser = function() {
+  var las = new Laser(this.center, 0 + (90 * 0.0174533), "Blue", 30);
+  this.lasers.push(las);
 }

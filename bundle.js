@@ -11,6 +11,7 @@ const Missile = require('./missile');
 const Enemy = require('./enemy');
 const Upgrade = require('./upgrade');
 const Particle = require('./particle');
+const Laser = require('./laser');
 
 
 /* Global variables */
@@ -22,12 +23,32 @@ var input = {
   left: false,
   right: false
 }
+
+// stars1 and stars2 keep track of the top and bot coords of the 2 images that maintain the constant scrolling background --
+// if you go to the top half of stars1 then stars2 coords are set to be above stars1 so that you seamlessly transition to stars2
+// but if you go to the bot half of stars1 then stars2 coords are set to be below stars1 so that you seamlessly transition to stars2 still
+// likewise for moving from stars2 -> stars1
+var stars1 = {
+  top: -512,
+  bot: 512
+}
+var stars2 = {
+  top: -1536,
+  bot: -512
+}
+
+
+var time = 0;
+var levelTime = [60000, 75000, 90000];
 var camera = new Camera(canvas);
-var bullets = new BulletPool(50);
+var bullets = new BulletPool(10);
 var missiles = [];
 var upgrades = [];
 var enemies = [];
 var player = new Player(bullets, missiles);
+
+var E = new Enemy(1, {x: 400, y: -200});
+enemies.push(E);
 
 var missileTimer = 0;
 var upgradeTimer = 0;
@@ -39,26 +60,23 @@ var close = [];
 var closeE = [];
 var removeUps = [];
 var markedForRemoval = [];
+var removeLas = [];
 var removeE = [];
 
 var particles = [];
 var removePart = [];
 
-var backgrounds = [
-  new Image(),
-  new Image()
-];
+var stars = new Image();
+var moons = new Image();
 
-backgrounds[0].src = 'assets/layer-1.png';
-backgrounds[0].style.width = '25%';
-backgrounds[0].style.height = 'auto';
-backgrounds[1].src = 'assets/layer-2.png';
-//backgrounds[2].src = '';
 
-var background = new Audio("assets/background.mp3");
+stars.src = "assets/layer-1.png";
+moons.src = "assets/layer-2.png";
+
+var background = new Audio("assets/bground.mp3");
 background.loop = true;
 background.volume = 0.05;
-//background.play();
+background.play();
 
 //left click
 window.onmousedown = function(event)
@@ -85,12 +103,12 @@ window.onkeypress = function(event) {
   if (event.keyCode == 32) {
     switch (player.state)
     {
-      case "standard":
+      case "default":
         player.fireMissile();
         if (player.bool == true) missileTimer = 0;
         break;
       case "empowered":
-        console.log("empowered shoot");
+        player.fireLaser();
         break;
     }
 
@@ -176,12 +194,17 @@ masterLoop(performance.now());
  */
 function update(elapsedTime) {
   upgradeTimer += elapsedTime;
+  time += elapsedTime;
+  checkHitEnemy();
+
   //reload missile after 5 seconds if the player has less than 4 missiles
   if (player.missileCount < 4) missileTimer += elapsedTime;
   if (missileTimer > 5000 && player.missileCount < 4) {
     player.missileCount++;
     missileTimer = 0;
   }
+  manageBackgrounds();
+
 
   //spawn random upgrade after a time between 10-20 seconds
   if (upgradeTimer > rand) {
@@ -209,18 +232,29 @@ function update(elapsedTime) {
   markedForRemoval = [];
   player.missiles.forEach(function(m, i){
     m.update(elapsedTime);
-    if(m.position.y < 0)
+    if(m.position.y < camera.y)
       markedForRemoval.unshift(i);
   });
   markedForRemoval.forEach(function(index){
     player.missiles.splice(index, 1);
   });
 
+  //update lasers
+  removeLas = [];
+  player.lasers.forEach(function(l, i){
+    l.update(elapsedTime);
+    if (l.position.y < camera.y)
+      removeLas.unshift(i);
+  });
+  removeLas.forEach(function(index){
+    player.lasers.splice(index, 1);
+  })
+
   //update upgrades
   removeUps = [];
   upgrades.forEach(function(u, i){
     u.update(elapsedTime);
-    if (u.position.y > 775)
+    if (u.position.y > camera.y + 775)
       removeUps.unshift(i);
   });
   removeUps.forEach(function(index){
@@ -237,6 +271,11 @@ function update(elapsedTime) {
   removePart.forEach(function(index){
     particles.splice(index, 1);
   });
+
+  //update enemies
+  enemies.forEach(function(e, i){
+    e.update(elapsedTime, camera, player);
+  })
 
 
 }
@@ -295,31 +334,31 @@ function renderWorld(elapsedTime, ctx) {
       p.render(elapsedTime, ctx);
     })
 
+    //render the enemies
+    enemies.forEach(function(e){
+      e.render(elapsedTime, ctx);
+    })
+
     // Render the player
     player.render(elapsedTime, ctx);
+    player.lasers.forEach(function(l){
+      l.render(elapsedTime, ctx);
+    });
 
-    if (player.state == "empowered") {
-      ctx.font = "20px Impact";
-      ctx.fillStyle = "LightBlue";
-      ctx.fillText("Empowered Weapons for " + Math.floor((10 - (player.empoweredTimer/1000))), 400, 140);
-    }
+
 }
 
 function renderBackgrounds(elapsedTime, ctx) {
-  //ctx.save();
-  //ctx.translate(0, -camera.y * 0.2);
-  //ctx.drawImage(backgrounds[2], 0, 0);
-  //ctx.restore();
-
-  ctx.save();
-  ctx.translate(0, -camera.y * 0.6);
-  ctx.drawImage(backgrounds[1], 0, 0);
-  ctx.restore();
 
   ctx.save();
   ctx.translate(0, -camera.y);
-  ctx.drawImage(backgrounds[0], 0, 0);
+  ctx.drawImage(stars, 0, stars1.top, canvas.width/2, 1024);
+  ctx.drawImage(stars, 512, stars1.top, canvas.width/2, 1024);
+  ctx.drawImage(stars, 0, stars2.top, canvas.width/2, 1024);
+  ctx.drawImage(stars, 512, stars2.top, canvas.width/2, 1024);
   ctx.restore();
+
+
 }
 
 /**
@@ -332,14 +371,21 @@ function renderGUI(elapsedTime, ctx) {
   // TODO: Render the GUI
   ctx.font = "15px Tahoma";
   ctx.fillStyle = "white";
-  ctx.fillText("Lives -- " + player.lives, 5,20);
+  ctx.fillText("Health -- " + player.lives, 5,20);
   ctx.fillText("Armor -- " + player.armor, 5,40);
 
   ctx.fillText("Missiles -- " + player.missileCount, 5,80);
   ctx.fillText("Reload Time -- " + Math.ceil(5 -missileTimer/1000), 5,100);
 
+  ctx.fillText("Time To Next Level -- " + Math.floor(levelTime[level-1] - time)/1000, 5, 730);
   ctx.fillText("Level -- " + level, 5,750);
   ctx.fillText("Score -- " + score, 5,770);
+
+  if (player.state == "empowered") {
+    ctx.font = "20px Impact";
+    ctx.fillStyle = "LightBlue";
+    ctx.fillText("Empowered Weapons for " + Math.floor((10 - (player.empoweredTimer/1000))), 400, 140);
+  }
 }
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -354,7 +400,7 @@ function spawnUpgrade() {
   if (t == 1) type = "health";
   if (t == 2) type = "armor";
   var spot = Math.random()*700 + 150;
-  var pos = {x: spot, y: 10};
+  var pos = {x: spot, y: camera.y + 10};
   var u = new Upgrade(pos, type);
   upgrades.push(u);
 }
@@ -457,7 +503,68 @@ function explosion(position, color, size)
   }
 }
 
-},{"./bullet_pool":2,"./camera":3,"./enemy":4,"./game":5,"./missile":6,"./particle":7,"./player":8,"./upgrade":9,"./vector":10}],2:[function(require,module,exports){
+function manageBackgrounds() {
+  if (player.stars == 1) {
+    if (player.position.y < stars2.bot && player.position.y > stars2.top) player.stars = 2;
+    if (player.position.y > stars2.top && player.position.y < stars2.bot) player.stars = 2;
+    if (player.position.y < stars1.top + 512) { stars2.bot = stars1.top; stars2.top = stars2.bot - 1024;}
+    if (player.position.y > stars1.top + 512) { stars2.top = stars1.bot; stars2.bot = stars2.top + 1024;}
+  }
+
+  if (player.stars == 2) {
+    if (player.position.y < stars1.bot && player.position.y > stars1.top) player.stars = 1;
+    if (player.position.y > stars1.top && player.position.y < stars1.bot) player.stars = 1;
+    if (player.position.y < stars2.top + 512) { stars1.bot = stars2.top; stars1.top = stars1.bot - 1024;}
+    if (player.position.y > stars2.top + 512) { stars1.top = stars2.bot; stars1.bot = stars1.top + 1024;}
+
+  }
+}
+
+function checkHitEnemy() {
+  player.missiles.forEach(function(m, i) {
+    enemies.forEach(function(e, index){
+      if (m.position.x > e.position.x && m.position.x < e.position.x + e.w && m.position.y < e.position.y + e.h && m.position.y > e.position.y)
+      {
+        score += 50;
+        e.hp -= 5;
+        if (e.hp > 0) { explosion(m.position, "red", "small"); explosion(m.position, "grey", "small"); }
+        if (e.hp <= 0) { explosion(m.position, "red", "big"); explosion(m.position, "grey", "big"); enemies.splice(index, 1); score += 100;}
+        player.missiles.splice(i, 1);
+      }
+    })
+  });
+  player.lasers.forEach(function(l, i) {
+    enemies.forEach(function(e, index){
+      if (l.position.x > e.position.x && l.position.x < e.position.x + e.w && l.position.y < e.position.y + e.h && l.position.y > e.position.y) {
+        score += 200;
+        e.hp -= 30;
+        if (e.hp > 0) { explosion(l.position, "red", "small"); explosion(l.position, "LightCoral", "small"); }
+        if (e.hp <= 0) { explosion(l.position, "blue", "big"); explosion(l.position, "white", "big"); enemies.splice(index, 1); score += 100;}
+        player.lasers.splice(i, 1)
+      }
+    })
+  });
+  enemies.forEach(function(e, i){
+    var index = 0;
+    while (index <= bullets.end-3)
+    {
+      var bx = bullets.pool[index];
+      var by = bullets.pool[index+1];
+      if (bx > e.position.x && bx < e.position.x + e.w && by < e.position.y + e.h && by > e.position.y) {
+        e.hp -= .5;
+        bullets.pool[index] = 0;
+        bullets.pool[index+1] = 0;
+        var pos = {x: bx, y: by};
+        if (e.hp > 0) { explosion(pos, "blue", "small"); explosion(pos, "LightBlue", "small"); }
+        if (e.hp <= 0) { explosion(pos, "blue", "big"); explosion(pos, "white", "big"); enemies.splice(index, 1); score += 100;}
+      }
+      index += 4;
+    }
+
+  })
+}
+
+},{"./bullet_pool":2,"./camera":3,"./enemy":4,"./game":5,"./laser":6,"./missile":7,"./particle":8,"./player":9,"./upgrade":10,"./vector":11}],2:[function(require,module,exports){
 "use strict";
 
 /**
@@ -547,10 +654,10 @@ BulletPool.prototype.render = function(elapsedTime, ctx) {
   // Render the bullets as a single path
   ctx.save();
   ctx.beginPath();
-  ctx.fillStyle = "red";
+  ctx.fillStyle = "LightBlue";
   for(var i = 0; i < this.end; i++) {
     ctx.moveTo(this.pool[4*i], this.pool[4*i+1]);
-    ctx.arc(this.pool[4*i], this.pool[4*i+1], 3, 0, 2*Math.PI);
+    ctx.arc(this.pool[4*i], this.pool[4*i+1], 4, 0, 2*Math.PI);
   }
   ctx.fill();
   ctx.restore();
@@ -587,6 +694,7 @@ function Camera(screen) {
  */
 Camera.prototype.update = function(target) {
   // TODO: Align camera with player
+  this.y = target.y - 500;
 }
 
 /**
@@ -603,6 +711,7 @@ Camera.prototype.onScreen = function(target) {
      target.y < this.y + this.height
    );
 }
+
 
 /**
  * @function toScreenCoordinates
@@ -624,7 +733,7 @@ Camera.prototype.toWorldCoordinates = function(screenCoordinates) {
   return Vector.add(screenCoordinates, this);
 }
 
-},{"./vector":10}],4:[function(require,module,exports){
+},{"./vector":11}],4:[function(require,module,exports){
 "use strict"
 
 module.exports = exports = Enemy;
@@ -635,8 +744,113 @@ function Enemy(type, position)
     x: position.x,
     y: position.y
   };
-  this.state = type;
-  
+  this.initX = position.x;
+  this.initY = position.y;
+  this.type = type;
+  this.state = "default";
+  this.img = new Image();
+  this.w;
+  this.h;
+  this.hp;
+  switch(this.type)
+  {
+    //blimp enemy
+    case 1:
+      this.img.src = "assets/blimp_enemy.png";
+      this.leftRight = 0; // left
+      this.upDown = 1; // down
+      this.w = 96;
+      this.h = 130;
+      this.hp = 20;
+      break;
+    //red enemy
+    case 2:
+      this.img.src = "assets/red_enemy.png";
+      this.w = 136;
+      this.h = 112;
+      this.hp = 20;
+      break;
+    //blue enemy
+    case 3:
+      this.img.src = "assets/blue_enemy.png";
+      this.w = 183;
+      this.h = 127;
+      this.hp = 30;
+      break;
+    //eye enemy
+    case 4:
+      this.img.src = "assets/eye_enemy.png";
+      this.w = 72;
+      this.h = 70;
+      this.hp = 5;
+      break;
+    //enemy 5
+    case 5:
+      this.img.rsc = "assets/5_enemy.png";
+      this.w = 120;
+      this.h = 140;
+      this.hp = 20;
+      break;
+  }
+}
+
+Enemy.prototype.update = function(time, camera, player) {
+  switch(this.type)
+  {
+    //blimp enemy
+    case 1:
+      //this.position.y = camera.y - this.initY - 150;
+      if (this.upDown == 0) this.position.y -= 1;
+      if (this.position.y < camera.y - this.initY - 150) this.upDown = 1;
+      if (this.upDown == 1) this.position.y += 1;
+      if (this.position.y > camera.y - this.initY + 300) this.upDown = 0;
+      // horizontal movement
+      if (this.leftRight == 0) this.position.x -= 1;
+      if (this.position.x < 150 && this.leftRight == 0) this.leftRight = 1;
+      if (this.leftRight == 1) this.position.x += 1;
+      if (this.position.x > 874 && this.leftRight == 1) this.leftRight = 0;
+      break;
+    //red enemy
+    case 2:
+      break;
+    //blue enemy
+    case 3:
+      break;
+    //eye enemy
+    case 4:
+      break;
+    //enemy 5
+    case 5:
+      break;
+  }
+}
+
+Enemy.prototype.render = function(time, ctx) {
+  switch(this.type)
+  {
+    //blimp enemy
+    case 1:
+      ctx.drawImage(this.img, 0, 10, 96, 130, this.position.x, this.position.y, 96, 130);
+      ctx.fillStyle = "red";
+      ctx.fillText(this.hp, this.position.x + 40, this.position.y + 80);
+      break;
+    //red enemy
+    case 2:
+      ctx.drawImage(this.img, 5, 112, 136, 112, this.position.x, this.position.y, 136, 112);
+      break;
+    //blue enemy
+    case 3:
+      ctx.drawImage(this.img, 4, 6, 183, 127, this.position.x, this.position.y, 183, 127);
+      break;
+    //eye enemy
+    case 4:
+      ctx.drawImage(this.img, 0, 112, 72, 70, this.position.x, this.position.y, 72, 70);
+      break;
+    //enemy 5
+    case 5:
+      ctx.drawImage(this.img, 0, 0, 120, 140, this.position.x, this.position.y, 120, 140);
+      break;
+  }
 }
 
 },{}],5:[function(require,module,exports){
@@ -698,6 +912,41 @@ Game.prototype.loop = function(newTime) {
 }
 
 },{}],6:[function(require,module,exports){
+"usse strict"
+
+module.exports = exports = Laser;
+
+function Laser (position, angle, color, speed)
+{
+  this.position = position;
+  this.angle = angle;
+  this.velocity = {
+    x: Math.cos(this.angle),
+    y: Math.sin(this.angle)
+  };
+  this.color = color;
+  this.speed = speed;
+
+}
+
+Laser.prototype.update = function(time)
+{
+  this.position.x += this.speed*(this.velocity.x);
+  this.position.y -= this.speed*(this.velocity.y);
+}
+
+Laser.prototype.render = function(time, ctx)
+{
+  ctx.strokeStyle = this.color;
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.moveTo(this.position.x, this.position.y);
+  ctx.lineTo(this.position.x + this.speed*(this.velocity.x), this.position.y - this.speed*(this.velocity.y));
+  ctx.stroke();
+  ctx.lineWidth = 1;
+}
+
+},{}],7:[function(require,module,exports){
 "use strict"
 
 module.exports = exports = Missile;
@@ -717,7 +966,6 @@ function Missile(pos, ang)
   this.onScreen = true;
   this.img = new Image();
   this.img.src = 'assets/weapons.png';
-  console.log("Missile created at " + this.position.x + " " + this.position.y);
   this.width = 20;
   this.height = 40;
 }
@@ -746,7 +994,7 @@ Missile.prototype.render = function(time, ctx)
 */
 }
 
-},{}],7:[function(require,module,exports){
+},{}],8:[function(require,module,exports){
 "use strict"
 
 module.exports = exports = Particle;
@@ -799,12 +1047,13 @@ Particle.prototype.render = function(time, ctx)
   ctx.restore();
 }
 
-},{}],8:[function(require,module,exports){
+},{}],9:[function(require,module,exports){
 "use strict";
 
 /* Classes and Libraries */
 const Vector = require('./vector');
 const Missile = require('./missile');
+const Laser = require('./laser');
 
 /* Constants */
 const PLAYER_SPEED = 5;
@@ -823,6 +1072,7 @@ module.exports = exports = Player;
  */
 function Player(bullets, missiles) {
   this.missiles = missiles;
+  this.lasers = [];
   this.missileCount = 4;
   this.bullets = bullets;
   this.angle = 0;
@@ -831,9 +1081,6 @@ function Player(bullets, missiles) {
   this.img = new Image()
   this.img.src = 'assets/ships.png';
 
-  this.fired = 0;
-  this.hit = 0;
-
   this.lives = 3;
   this.armor = 0;
 
@@ -841,10 +1088,11 @@ function Player(bullets, missiles) {
   this.firing = false;
   this.bulletTimer = 0;
 
-  this.state = "standard";
+  this.state = "default";
   this.armored = false;
 
   this.empoweredTimer = 0;
+  this.stars = 1;
 
   this.center;
 }
@@ -862,7 +1110,7 @@ Player.prototype.update = function(elapsedTime, input) {
   this.bool = false;
   if (this.state == "empowered") {
     this.empoweredTimer += elapsedTime;
-    if (this.empoweredTimer > 10000) { this.state = "standard"; }
+    if (this.empoweredTimer > 10000) { this.state = "default"; }
    }
   this.bulletTimer += elapsedTime;
   // set the velocity
@@ -881,12 +1129,13 @@ Player.prototype.update = function(elapsedTime, input) {
   // move the player
   this.position.x += this.velocity.x;
   this.position.y += this.velocity.y;
+  this.position.y -= .5;
 
   // don't let the player move off-screen
   if(this.position.x < 0) this.position.x = 0;
   if(this.position.x > 1001) this.position.x = 1001;
-  if(this.position.y > 759) this.position.y = 759;
-  if(this.position.y < 0) this.position.y = 0;
+  //if(this.position.y > 759) this.position.y = 759;
+  //if(this.position.y < 0) this.position.y = 0;
 
   var temp = this.velocity.y;
   if (temp > 1) temp = temp * -1;
@@ -921,6 +1170,7 @@ Player.prototype.render = function(elapasedTime, ctx) {
     ctx.closePath();
     ctx.stroke();
   }
+
 }
 
 /**
@@ -949,7 +1199,12 @@ Player.prototype.fireMissile = function() {
   }
 }
 
-},{"./missile":6,"./vector":10}],9:[function(require,module,exports){
+Player.prototype.fireLaser = function() {
+  var las = new Laser(this.center, 0 + (90 * 0.0174533), "Blue", 30);
+  this.lasers.push(las);
+}
+
+},{"./laser":6,"./missile":7,"./vector":11}],10:[function(require,module,exports){
 "use strict"
 
 module.exports = exports = Upgrade;
@@ -1005,7 +1260,7 @@ Upgrade.prototype.render = function(time, ctx)
   }
 }
 
-},{}],10:[function(require,module,exports){
+},{}],11:[function(require,module,exports){
 "use strict";
 
 /**
