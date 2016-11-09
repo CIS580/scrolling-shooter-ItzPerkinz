@@ -26,13 +26,12 @@ function Player(bullets, missiles) {
   this.missileCount = 4;
   this.bullets = bullets;
   this.angle = 0;
-  this.position = {x: 200, y: 200};
+  this.position = {x: 512, y: 650};
   this.velocity = {x: 0, y: 0};
   this.img = new Image()
   this.img.src = 'assets/ships.png';
 
   this.lives = 3;
-  this.armor = 0;
 
   this.bool = false;
   this.firing = false;
@@ -41,8 +40,16 @@ function Player(bullets, missiles) {
   this.state = "default";
   this.armored = false;
 
+  this.w = 46;
+  this.h = 54;
+
   this.empoweredTimer = 0;
+  this.immune = false;
+  this.immuneTimer = 0;
   this.stars = 1;
+
+  this.laz = new Audio("assets/laser.wav");
+  this.laz.volume = 0.2;
 
   this.center;
 }
@@ -57,6 +64,8 @@ function Player(bullets, missiles) {
  * boolean properties: up, left, right, down
  */
 Player.prototype.update = function(elapsedTime, input) {
+  if (this.immune == true) { this.immuneTimer += elapsedTime; }
+  if (this.immuneTimer > 3000) { this.immune = false; this.immuneTimer = 0;}
   this.bool = false;
   if (this.state == "empowered") {
     this.empoweredTimer += elapsedTime;
@@ -112,10 +121,18 @@ Player.prototype.render = function(elapasedTime, ctx) {
 // -12.5, -12,
   ctx.restore();
 
-  if (this.armored == true)
+  if (this.armored == true )
   {
     ctx.beginPath();
     ctx.strokeStyle = "yellow";
+    ctx.arc(this.position.x+23, this.position.y+27, 30, 0, Math.PI*2);
+    ctx.closePath();
+    ctx.stroke();
+  }
+  if (this.immune == true)
+  {
+    ctx.beginPath();
+    ctx.strokeStyle = "white";
     ctx.arc(this.position.x+23, this.position.y+27, 30, 0, Math.PI*2);
     ctx.closePath();
     ctx.stroke();
@@ -141,8 +158,7 @@ Player.prototype.fireBullet = function(direction) {
  */
 Player.prototype.fireMissile = function() {
   if(this.missileCount > 0){
-    console.log(this.missiles.length);
-    var missile = new Missile(this.position, this.angle );
+    var missile = new Missile(this.position, 0 + (90 * 0.0174533) );
     this.missiles.push(missile);
     this.missileCount--;
     if (this.missileCount == 3) this.bool = true;
@@ -150,6 +166,7 @@ Player.prototype.fireMissile = function() {
 }
 
 Player.prototype.fireLaser = function() {
+  this.laz.play();
   var las = new Laser(this.center, 0 + (90 * 0.0174533), "Blue", 30);
   this.lasers.push(las);
 }

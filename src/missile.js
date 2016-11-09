@@ -8,7 +8,7 @@ function Missile(pos, ang)
     x: pos.x+13,
     y: pos.y
   };
-  this.angle = (ang+90) * 0.0174533;
+  this.angle = ang;
   this.velocity = {
     x: Math.cos(this.angle),
     y: Math.sin(this.angle)
@@ -16,7 +16,9 @@ function Missile(pos, ang)
   this.state = "unlocked";
   this.onScreen = true;
   this.img = new Image();
-  this.img.src = 'assets/weapons.png';
+  if (this.velocity.y > 0) this.img.src = 'assets/weapons.png';
+  if (this.velocity.y < 0) this.img.src = 'assets/weaponsDown.png';
+
   this.width = 20;
   this.height = 40;
 }
@@ -37,7 +39,8 @@ Missile.prototype.update = function(time)
 
 Missile.prototype.render = function(time, ctx)
 {
-  ctx.drawImage(this.img, 217, 29, 10, 14, this.position.x, this.position.y, 20, 40);
+  if (this.velocity.y > 0) ctx.drawImage(this.img, 217, 29, 10, 14, this.position.x, this.position.y, 20, 40);
+  if (this.velocity.y < 0) ctx.drawImage(this.img, 1, 154, 10, 14, this.position.x, this.position.y, 20, 40);
 /*
   ctx.strokeStyle = "white";
   ctx.rect(this.position.x, this.position.y, this.width, this.height );
