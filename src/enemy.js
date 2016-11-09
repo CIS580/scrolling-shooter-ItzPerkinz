@@ -112,7 +112,7 @@ Enemy.prototype.update = function(time, camera, player) {
     case 1:
       //this.position.y = camera.y - this.initY - 150;
       if (this.upDown == 0) this.position.y -= 10;
-      if (this.position.y < camera.y - this.initY - 150) this.upDown = 1;
+      if (this.position.y < camera.y - 100) this.upDown = 1;
       if (this.upDown == 1) this.position.y += 1;
       if (this.position.y > camera.y + 300) this.upDown = 0;
       // horizontal movement
